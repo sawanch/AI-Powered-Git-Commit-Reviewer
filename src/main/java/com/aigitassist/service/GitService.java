@@ -69,16 +69,34 @@ public class GitService {
             List<DiffEntry> diffEntries;
             if (headTree != null) {
                 diffEntries = diffFormatter.scan(headTree, indexTree);
+                if (diffEntries.isEmpty()) {
+                    return "";
+                }
+                diffFormatter.format(diffEntries);
             } else {
-                // First commit - all files are new
-                diffEntries = diffFormatter.scan(null, indexTree);
+                // First commit - create a simple diff showing all files as new
+                // For initial commit, manually format as all additions
+                Status status = git.status().call();
+                StringBuilder initialDiff = new StringBuilder();
+                
+                for (String added : status.getAdded()) {
+                    File file = new File(repoDir, added);
+                    if (file.exists()) {
+                        initialDiff.append("diff --git a/").append(added).append(" b/").append(added).append("\n");
+                        initialDiff.append("new file\n");
+                        initialDiff.append("--- /dev/null\n");
+                        initialDiff.append("+++ b/").append(added).append("\n");
+                        initialDiff.append("+[New file added]\n");
+                    }
+                }
+                
+                if (initialDiff.length() == 0) {
+                    return "";
+                }
+                
+                return initialDiff.toString();
             }
-
-            if (diffEntries.isEmpty()) {
-                return "";
-            }
-
-            diffFormatter.format(diffEntries);
+            
             return outputStream.toString(StandardCharsets.UTF_8.name());
         }
     }
